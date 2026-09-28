@@ -1,2 +1,1416 @@
-Ready for assignment 2.
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>XTK 3D Star Cube Art Visualization - CS460</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Space+Grotesk:wght@400;600&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --bg-dark: #05070e;
+      --panel-bg: rgba(10, 14, 26, 0.82);
+      --panel-border: rgba(99, 140, 255, 0.32);
+      --accent-cyan: #00f2fe;
+      --accent-gold: #ffb703;
+      --accent-magenta: #ff007f;
+      --accent-purple: #7928ca;
+      --accent-green: #00ff88;
+      --text-main: #f0f4ff;
+      --text-dim: #8b9bb4;
+      --glow-gold: 0 0 16px rgba(255, 183, 3, 0.5);
+      --glow-cyan: 0 0 16px rgba(0, 242, 254, 0.45);
+      --glow-magenta: 0 0 16px rgba(255, 0, 127, 0.5);
+    }
 
+    * {
+      box-sizing: border-box;
+      user-select: none;
+    }
+
+    html, body {
+      background-color: var(--bg-dark);
+      background-image: 
+        radial-gradient(circle at 50% 50%, rgba(26, 36, 68, 0.65) 0%, transparent 80%),
+        radial-gradient(circle at 85% 15%, rgba(255, 183, 3, 0.12) 0%, transparent 45%),
+        radial-gradient(circle at 15% 85%, rgba(0, 242, 254, 0.12) 0%, transparent 45%);
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      width: 100%;
+      overflow: hidden;
+      font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+      color: var(--text-main);
+    }
+
+    /* Fullscreen WebGL Container */
+    #container {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
+
+    canvas {
+      width: 100% !important;
+      height: 100% !important;
+      display: block;
+      outline: none;
+    }
+
+    /* Subtle background grid */
+    .bg-grid {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 2;
+      opacity: 0.15;
+      background-size: 40px 40px;
+      background-image: 
+        linear-gradient(to right, rgba(255, 255, 255, 0.08) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+    }
+
+    /* Glassmorphism Control Panel */
+    #hud {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      z-index: 10;
+      width: 330px;
+      max-height: calc(100vh - 40px);
+      overflow-y: auto;
+      background: var(--panel-bg);
+      backdrop-filter: blur(15px);
+      -webkit-backdrop-filter: blur(15px);
+      border: 1px solid var(--panel-border);
+      border-radius: 16px;
+      padding: 18px 20px;
+      box-shadow: 0 14px 45px rgba(0, 0, 0, 0.7), 0 0 25px rgba(255, 183, 3, 0.1);
+      transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+    }
+
+    #hud::-webkit-scrollbar {
+      width: 5px;
+    }
+    #hud::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 10px;
+    }
+
+    #hud.collapsed {
+      transform: translateX(-360px);
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    #toggle-hud-btn {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      z-index: 11;
+      background: var(--panel-bg);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--accent-gold);
+      border-radius: 10px;
+      color: var(--accent-gold);
+      font-size: 13px;
+      font-family: 'Orbitron', monospace;
+      padding: 8px 14px;
+      cursor: pointer;
+      display: none;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+    }
+    #hud.collapsed + #toggle-hud-btn {
+      display: block;
+    }
+
+    /* Header & Branding */
+    .hud-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+      padding-bottom: 12px;
+      margin-bottom: 14px;
+    }
+
+    .brand-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 15px;
+      font-weight: 900;
+      letter-spacing: 1.2px;
+      background: linear-gradient(135deg, var(--accent-gold), #fff, var(--accent-cyan));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-transform: uppercase;
+    }
+
+    .brand-badge {
+      font-family: 'Orbitron', monospace;
+      font-size: 10px;
+      background: rgba(255, 183, 3, 0.18);
+      border: 1px solid rgba(255, 183, 3, 0.45);
+      color: var(--accent-gold);
+      padding: 2px 7px;
+      border-radius: 20px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+    }
+
+    .hud-close {
+      cursor: pointer;
+      color: var(--text-dim);
+      font-size: 18px;
+      line-height: 1;
+      transition: color 0.2s;
+    }
+    .hud-close:hover {
+      color: var(--accent-magenta);
+    }
+
+    /* Sketch Note Reference Box */
+    .sketch-legend {
+      background: rgba(255, 255, 255, 0.04);
+      border-left: 3px solid var(--accent-gold);
+      border-radius: 4px;
+      padding: 8px 10px;
+      font-size: 11px;
+      line-height: 1.4;
+      margin-bottom: 16px;
+      color: #ccd6f6;
+    }
+    .sketch-legend span.highlight-rotate {
+      color: var(--accent-gold);
+      font-weight: 700;
+    }
+    .sketch-legend span.highlight-color {
+      color: var(--accent-cyan);
+      font-weight: 700;
+    }
+
+    /* Sections */
+    .hud-section {
+      margin-bottom: 16px;
+    }
+
+    .section-title {
+      font-family: 'Orbitron', monospace;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--accent-gold);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .section-title::before {
+      content: '';
+      display: inline-block;
+      width: 4px;
+      height: 11px;
+      background: var(--accent-gold);
+      border-radius: 2px;
+    }
+
+    /* Button Grids */
+    .btn-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 6px;
+    }
+
+    .btn-grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 5px;
+    }
+
+    button.hud-btn {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 8px;
+      color: var(--text-main);
+      padding: 7px 9px;
+      font-size: 11px;
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      transition: all 0.2s ease;
+      outline: none;
+      text-align: center;
+    }
+
+    button.hud-btn:hover {
+      background: rgba(255, 183, 3, 0.15);
+      border-color: var(--accent-gold);
+      color: #fff;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(255, 183, 3, 0.25);
+    }
+
+    button.hud-btn.active {
+      background: linear-gradient(135deg, rgba(255, 183, 3, 0.3), rgba(255, 0, 127, 0.25));
+      border-color: var(--accent-gold);
+      color: #fff;
+      box-shadow: var(--glow-gold);
+    }
+
+    /* Starburst Action Button */
+    button.btn-shockwave {
+      grid-column: span 2;
+      background: linear-gradient(135deg, rgba(255, 183, 3, 0.3), rgba(255, 0, 127, 0.4));
+      border: 1px solid var(--accent-gold);
+      color: #fff;
+      font-family: 'Orbitron', monospace;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      padding: 9px;
+      box-shadow: var(--glow-gold);
+    }
+
+    button.btn-shockwave:hover {
+      background: linear-gradient(135deg, rgba(255, 183, 3, 0.5), rgba(255, 0, 127, 0.6));
+      box-shadow: 0 0 20px rgba(255, 183, 3, 0.7);
+      transform: translateY(-2px);
+    }
+
+    /* Sliders */
+    .slider-row {
+      margin-bottom: 10px;
+    }
+
+    .slider-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-bottom: 3px;
+    }
+
+    .slider-header .val {
+      color: var(--accent-gold);
+      font-family: 'Orbitron', monospace;
+      font-weight: 700;
+    }
+
+    input[type=range] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 5px;
+      border-radius: 5px;
+      background: rgba(255, 255, 255, 0.12);
+      outline: none;
+      margin: 0;
+    }
+
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--accent-gold);
+      cursor: pointer;
+      box-shadow: 0 0 8px var(--accent-gold);
+      transition: transform 0.15s;
+    }
+
+    input[type=range]::-webkit-slider-thumb:hover {
+      transform: scale(1.3);
+    }
+
+    /* Stats Panel */
+    #stats-panel {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      z-index: 10;
+      background: var(--panel-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--panel-border);
+      border-radius: 12px;
+      padding: 10px 16px;
+      font-family: 'Space Grotesk', monospace;
+      font-size: 11px;
+      color: var(--text-dim);
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+    }
+
+    .stat-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .stat-label {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+
+    .stat-val {
+      font-family: 'Orbitron', monospace;
+      font-size: 13px;
+      font-weight: 700;
+      color: #fff;
+    }
+    .stat-val.accent { color: var(--accent-gold); }
+    .stat-val.cyan { color: var(--accent-cyan); }
+
+    /* Hotkey Bar */
+    #hotkey-pill {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      z-index: 10;
+      background: var(--panel-bg);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--panel-border);
+      border-radius: 20px;
+      padding: 7px 15px;
+      font-size: 11px;
+      color: var(--text-dim);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .kbd {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-family: 'Orbitron', monospace;
+      font-size: 9px;
+      color: var(--accent-gold);
+    }
+
+    #scene-file-input { display: none; }
+
+    /* Notification Toast */
+    #toast {
+      position: absolute;
+      top: 25px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-100px);
+      background: rgba(10, 14, 26, 0.94);
+      border: 1px solid var(--accent-gold);
+      box-shadow: var(--glow-gold);
+      border-radius: 25px;
+      padding: 9px 22px;
+      font-family: 'Orbitron', monospace;
+      font-size: 12px;
+      color: #fff;
+      z-index: 100;
+      pointer-events: none;
+      transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s;
+      opacity: 0;
+    }
+    #toast.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+  </style>
+
+  <!-- Load XTK WebGL Framework -->
+  <script type="text/javascript" src="https://get.goXTK.com/xtk_edge.js"></script>
+  <!-- Load Scene Storage (CS460 loader.js) -->
+  <script type="text/javascript" src="loader.js"></script>
+</head>
+<body>
+
+  <div class="bg-grid"></div>
+  <div id="container"></div>
+  <div id="toast">STAR VISUALIZATION READY</div>
+
+  <!-- HUD Control Panel -->
+  <div id="hud">
+    <div class="hud-header">
+      <div>
+        <div class="brand-title">Star Cube Art</div>
+        <div style="font-size: 10px; color: var(--text-dim); margin-top: 2px;">Interactive Sketch Visualization</div>
+      </div>
+      <span class="brand-badge">XTK 3D</span>
+      <span class="hud-close" id="hud-close-btn" title="Minimize panel">×</span>
+    </div>
+
+    <!-- Sketch Legend Details -->
+    <div class="sketch-legend">
+      ⭐ <strong>Drawing Match:</strong><br>
+      • Center & rays: <span class="highlight-rotate">Larger rotating cubes</span><br>
+      • Perimeter outline: <span class="highlight-color">Cubes continuously change color</span><br>
+      • Outward: <span style="color:#fff;">Trails of cubes streaming outward</span>
+    </div>
+
+    <!-- Visualization Dimensional Modes -->
+    <div class="hud-section">
+      <div class="section-title">Star Modes</div>
+      <div class="btn-grid">
+        <button class="hud-btn active" data-mode="sketch">⭐ Sketch Match</button>
+        <button class="hud-btn" data-mode="crystal">💎 3D Crystal Star</button>
+        <button class="hud-btn" data-mode="wave">🌊 Star Wave</button>
+        <button class="hud-btn" data-mode="vortex">🌀 Cosmic Vortex</button>
+        <button class="hud-btn" data-mode="solar">☀️ Solar Flare</button>
+        <button class="hud-btn" data-mode="orbit">💫 Satellite Swarm</button>
+      </div>
+    </div>
+
+    <!-- Color Changing Themes -->
+    <div class="hud-section">
+      <div class="section-title">Color Palettes</div>
+      <div class="btn-grid-3">
+        <button class="hud-btn active" data-theme="prismatic">🌈 Rainbow</button>
+        <button class="hud-btn" data-theme="synthwave">🔮 Synth</button>
+        <button class="hud-btn" data-theme="starlight">✨ Gold</button>
+        <button class="hud-btn" data-theme="aurora">🌿 Aurora</button>
+        <button class="hud-btn" data-theme="solar">🔥 Solar</button>
+        <button class="hud-btn" data-theme="matrix">💻 Matrix</button>
+      </div>
+    </div>
+
+    <!-- Real-time Sliders -->
+    <div class="hud-section">
+      <div class="section-title">Kinetic Controls</div>
+      
+      <div class="slider-row">
+        <div class="slider-header">
+          <span>Large Cube Spin Speed</span>
+          <span class="val" id="val-rot">1.2x</span>
+        </div>
+        <input type="range" id="slider-rot" min="0.0" max="3.5" step="0.1" value="1.2">
+      </div>
+
+      <div class="slider-row">
+        <div class="slider-header">
+          <span>Color Cycle Speed</span>
+          <span class="val" id="val-color">1.0x</span>
+        </div>
+        <input type="range" id="slider-color" min="0.2" max="3.0" step="0.1" value="1.0">
+      </div>
+
+      <div class="slider-row">
+        <div class="slider-header">
+          <span>Outward Trail Flow Speed</span>
+          <span class="val" id="val-trail">1.3x</span>
+        </div>
+        <input type="range" id="slider-trail" min="0.2" max="3.0" step="0.1" value="1.3">
+      </div>
+
+      <div class="slider-row">
+        <div class="slider-header">
+          <span>3D Depth (Z-Extrusion)</span>
+          <span class="val" id="val-depth">1.0x</span>
+        </div>
+        <input type="range" id="slider-depth" min="0.0" max="2.5" step="0.1" value="1.0">
+      </div>
+    </div>
+
+    <!-- Action Triggers -->
+    <div class="hud-section">
+      <div class="section-title">Actions & Perspectives</div>
+      <div class="btn-grid">
+        <button class="hud-btn btn-shockwave" id="btn-burst">💥 TRIGGER STARBURST</button>
+        <button class="hud-btn" id="btn-top-view">📐 2D Sketch View</button>
+        <button class="hud-btn" id="btn-iso-view">📐 3D Perspective</button>
+        <button class="hud-btn" id="btn-orbit">🎥 Orbit: OFF</button>
+        <button class="hud-btn" id="btn-audio">🔊 Audio: OFF</button>
+      </div>
+    </div>
+
+    <!-- Scene JSON Storage -->
+    <div class="hud-section">
+      <div class="section-title">Scene Persistence</div>
+      <div class="btn-grid">
+        <button class="hud-btn" id="btn-export">💾 Save Scene JSON</button>
+        <button class="hud-btn" id="btn-import">📂 Load Scene JSON</button>
+      </div>
+      <input type="file" id="scene-file-input" accept=".json">
+    </div>
+  </div>
+
+  <button id="toggle-hud-btn">⚙ CONTROLS</button>
+
+  <!-- Live Stats Panel -->
+  <div id="stats-panel">
+    <div class="stat-item">
+      <span class="stat-label">Frame Rate</span>
+      <span class="stat-val accent" id="fps-display">60 FPS</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-label">Large Cubes</span>
+      <span class="stat-val" id="large-cubes-display">26</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-label">Star Cubes</span>
+      <span class="stat-val cyan" id="star-cubes-display">180</span>
+    </div>
+  </div>
+
+  <!-- Keyboard Shortcuts Bar -->
+  <div id="hotkey-pill">
+    <span><span class="kbd">SPACE</span> Starburst</span>
+    <span><span class="kbd">M</span> Mode</span>
+    <span><span class="kbd">C</span> Palette</span>
+    <span><span class="kbd">O</span> Orbit</span>
+    <span><span class="kbd">V</span> View</span>
+    <span><span class="kbd">S</span> Save JSON</span>
+  </div>
+
+  <!-- Interactive 3D Visualization Script -->
+  <script type="text/javascript">
+    var r = null;
+    var CAMERAS = [];
+
+    window.onload = function() {
+      // 1. Initialize XTK 3D Renderer
+      r = new X.renderer3D();
+      r.container = 'container';
+      r.init();
+
+      // Set initial angled 3D camera view
+      r.camera.position = [0, -180, 240];
+      r.camera.focus = [0, 0, 0];
+      r.camera.up = [0, 0, 1];
+
+      if (typeof CAMERAS !== 'undefined') {
+        CAMERAS = [r.camera.view];
+      }
+
+      // ----------------------------------------------------
+      // ART STATE & STAR CONFIGURATION
+      // ----------------------------------------------------
+      var CONFIG = {
+        mode: 'sketch',        // 'sketch', 'crystal', 'wave', 'vortex', 'solar', 'orbit'
+        theme: 'prismatic',     // 'prismatic', 'synthwave', 'starlight', 'aurora', 'solar', 'matrix'
+        rotSpeed: 1.2,
+        colorSpeed: 1.0,
+        trailSpeed: 1.3,
+        depth3D: 1.0,
+        autoOrbit: false,
+        audioEnabled: false,
+        isBurst: false,
+        burstTime: 0
+      };
+
+      // ----------------------------------------------------
+      // 5-POINTED STAR GEOMETRIC PARAMETERS
+      // ----------------------------------------------------
+      var R_OUTER = 125; // Distance to star tips
+      var R_INNER = 52;  // Distance to star inner notches (indentations)
+
+      // Calculate 5 tips & 5 inner notches
+      var TIPS = [];
+      var NOTCHES = [];
+      for (var k = 0; k < 5; k++) {
+        var angleTip = Math.PI / 2 + k * (Math.PI * 2 / 5);
+        TIPS.push({
+          x: R_OUTER * Math.cos(angleTip),
+          y: R_OUTER * Math.sin(angleTip),
+          angle: angleTip,
+          index: k
+        });
+
+        var angleNotch = angleTip + Math.PI / 5;
+        NOTCHES.push({
+          x: R_INNER * Math.cos(angleNotch),
+          y: R_INNER * Math.sin(angleNotch),
+          angle: angleNotch,
+          index: k
+        });
+      }
+
+      // Array holding all cubes and metadata
+      var cubes = [];
+      var cubeData = [];
+
+      // ----------------------------------------------------
+      // GROUP 1: LARGER ROTATING CUBES (Core & 5 Radiating Spines)
+      // As marked "[ ] = Rotate" in the user sketch
+      // ----------------------------------------------------
+      // Central core cube
+      var coreCube = new X.cube();
+      coreCube.lengthX = 22;
+      coreCube.lengthY = 22;
+      coreCube.lengthZ = 22;
+      coreCube.color = [1.0, 0.85, 0.2];
+      r.add(coreCube);
+      cubes.push(coreCube);
+      cubeData.push({
+        type: 'core',
+        role: 'large_rotating',
+        rayIdx: -1,
+        step: 0,
+        distFromCenter: 0,
+        origX: 0, origY: 0, origZ: 0,
+        currX: 0, currY: 0, currZ: 0,
+        currRotX: 0, currRotY: 0, currRotZ: 0,
+        baseLength: 22,
+        burstVx: 0, burstVy: 0, burstVz: 0
+      });
+
+      // 5 Radiating Spines of larger rotating cubes along the 5 star arms
+      var LARGE_PER_RAY = 5; // 5 larger cubes along each ray
+      for (var k = 0; k < 5; k++) {
+        var tip = TIPS[k];
+        for (var s = 1; s <= LARGE_PER_RAY; s++) {
+          var frac = s / (LARGE_PER_RAY + 0.4);
+          var x = tip.x * frac;
+          var y = tip.y * frac;
+          var dist = Math.sqrt(x * x + y * y);
+
+          // Taper size slightly outward: 19 down to 15
+          var size = 19 - s * 0.8;
+
+          var largeCube = new X.cube();
+          largeCube.lengthX = size;
+          largeCube.lengthY = size;
+          largeCube.lengthZ = size;
+          largeCube.color = [1.0, 0.9, 0.3];
+          r.add(largeCube);
+          cubes.push(largeCube);
+
+          cubeData.push({
+            type: 'ray_large',
+            role: 'large_rotating',
+            rayIdx: k,
+            step: s,
+            distFromCenter: dist,
+            origX: x, origY: y, origZ: 0,
+            currX: x, currY: y, currZ: 0,
+            currRotX: Math.random() * Math.PI,
+            currRotY: Math.random() * Math.PI,
+            currRotZ: Math.random() * Math.PI,
+            baseLength: size,
+            burstVx: 0, burstVy: 0, burstVz: 0
+          });
+        }
+      }
+
+      // ----------------------------------------------------
+      // GROUP 2: STAR PERIMETER BOUNDARY CUBES
+      // As marked "[ ] = Colors change" in the user sketch
+      // Tracing the 10 edges of the 5-pointed star
+      // ----------------------------------------------------
+      var CUBES_PER_EDGE = 7;
+      for (var k = 0; k < 5; k++) {
+        var pTip1 = TIPS[k];
+        var pNotch = NOTCHES[k];
+        var pTip2 = TIPS[(k + 1) % 5];
+
+        // Segment 1: from Tip k to Notch k
+        for (var j = 0; j < CUBES_PER_EDGE; j++) {
+          var tEdge = (j + 0.5) / CUBES_PER_EDGE;
+          var px = pTip1.x + (pNotch.x - pTip1.x) * tEdge;
+          var py = pTip1.y + (pNotch.y - pTip1.y) * tEdge;
+          var dist = Math.sqrt(px * px + py * py);
+
+          var edgeCube = new X.cube();
+          edgeCube.lengthX = 9;
+          edgeCube.lengthY = 9;
+          edgeCube.lengthZ = 9;
+          edgeCube.color = [0.0, 0.9, 1.0];
+          r.add(edgeCube);
+          cubes.push(edgeCube);
+
+          cubeData.push({
+            type: 'perimeter',
+            role: 'star_outline',
+            rayIdx: k,
+            edgeIdx: k * 2,
+            edgePos: j / CUBES_PER_EDGE,
+            distFromCenter: dist,
+            origX: px, origY: py, origZ: 0,
+            currX: px, currY: py, currZ: 0,
+            currRotX: 0, currRotY: 0, currRotZ: 0,
+            baseLength: 9,
+            burstVx: 0, burstVy: 0, burstVz: 0
+          });
+        }
+
+        // Segment 2: from Notch k to Tip (k+1)%5
+        for (var j = 0; j < CUBES_PER_EDGE; j++) {
+          var tEdge = (j + 0.5) / CUBES_PER_EDGE;
+          var px = pNotch.x + (pTip2.x - pNotch.x) * tEdge;
+          var py = pNotch.y + (pTip2.y - pNotch.y) * tEdge;
+          var dist = Math.sqrt(px * px + py * py);
+
+          var edgeCube = new X.cube();
+          edgeCube.lengthX = 9;
+          edgeCube.lengthY = 9;
+          edgeCube.lengthZ = 9;
+          edgeCube.color = [0.0, 0.9, 1.0];
+          r.add(edgeCube);
+          cubes.push(edgeCube);
+
+          cubeData.push({
+            type: 'perimeter',
+            role: 'star_outline',
+            rayIdx: (k + 1) % 5,
+            edgeIdx: k * 2 + 1,
+            edgePos: j / CUBES_PER_EDGE,
+            distFromCenter: dist,
+            origX: px, origY: py, origZ: 0,
+            currX: px, currY: py, currZ: 0,
+            currRotX: 0, currRotY: 0, currRotZ: 0,
+            baseLength: 9,
+            burstVx: 0, burstVy: 0, burstVz: 0
+          });
+        }
+      }
+
+      // ----------------------------------------------------
+      // GROUP 3: TRAILS OF CUBES EXTENDING OUTWARD FROM CENTER
+      // As requested: "with trails of cubes extending outward"
+      // ----------------------------------------------------
+      var TRAILS_PER_ARM = 8; // 8 dynamic kinetic trail cubes per star arm
+      for (var k = 0; k < 5; k++) {
+        var tip = TIPS[k];
+        var dirX = tip.x / R_OUTER;
+        var dirY = tip.y / R_OUTER;
+
+        for (var m = 0; m < TRAILS_PER_ARM; m++) {
+          var trailCube = new X.cube();
+          var s = 7 + (m % 3);
+          trailCube.lengthX = s;
+          trailCube.lengthY = s;
+          trailCube.lengthZ = s;
+          trailCube.color = [1.0, 0.2, 0.7];
+          r.add(trailCube);
+          cubes.push(trailCube);
+
+          cubeData.push({
+            type: 'trail',
+            role: 'flying_trail',
+            rayIdx: k,
+            trailIdx: m,
+            dirX: dirX,
+            dirY: dirY,
+            distFromCenter: 0,
+            trailProgress: (m / TRAILS_PER_ARM),
+            origX: 0, origY: 0, origZ: 0,
+            currX: 0, currY: 0, currZ: 0,
+            currRotX: Math.random() * Math.PI,
+            currRotY: Math.random() * Math.PI,
+            currRotZ: Math.random() * Math.PI,
+            baseLength: s,
+            burstVx: 0, burstVy: 0, burstVz: 0
+          });
+        }
+      }
+
+      // Initial XTK Render
+      r.render();
+
+      // Update HUD count
+      var largeCount = cubeData.filter(function(d){ return d.role === 'large_rotating'; }).length;
+      document.getElementById('large-cubes-display').textContent = largeCount;
+      document.getElementById('star-cubes-display').textContent = cubes.length;
+
+      // ----------------------------------------------------
+      // DYNAMIC COLOR ENGINE (Vibrant continuous wave math)
+      // ----------------------------------------------------
+      function calculateCubeColor(theme, t, dist, isLarge, role, rayIdx) {
+        var rCol = 1, gCol = 1, bCol = 1;
+
+        if (theme === 'prismatic') {
+          // Flowing rainbow spectrum radiating outward from the star center
+          var hue = (t * 0.3 * CONFIG.colorSpeed + dist * 0.005 + (rayIdx >= 0 ? rayIdx * 0.2 : 0)) % 1.0;
+          if (hue < 0) hue += 1.0;
+          // HSV to RGB
+          var h6 = hue * 6;
+          var f = h6 - Math.floor(h6);
+          var q = 1 - f;
+          switch (Math.floor(h6) % 6) {
+            case 0: rCol = 1; gCol = f; bCol = 0; break;
+            case 1: rCol = q; gCol = 1; bCol = 0; break;
+            case 2: rCol = 0; gCol = 1; bCol = f; break;
+            case 3: rCol = 0; gCol = q; bCol = 1; break;
+            case 4: rCol = f; gCol = 0; bCol = 1; break;
+            case 5: rCol = 1; gCol = 0; bCol = q; break;
+          }
+          // If large rotating cube, add luminous starlight core boost
+          if (isLarge) {
+            rCol = Math.min(1.0, rCol * 0.8 + 0.35);
+            gCol = Math.min(1.0, gCol * 0.8 + 0.35);
+            bCol = Math.min(1.0, bCol * 0.8 + 0.35);
+          }
+        }
+        else if (theme === 'synthwave') {
+          // Hot pink, electric purple, neon cyan
+          var wave = Math.sin(t * 2.0 * CONFIG.colorSpeed - dist * 0.035);
+          if (isLarge) {
+            // Radiant golden-pink for rotating core
+            rCol = 1.0; gCol = 0.8 + 0.2 * wave; bCol = 0.25;
+          } else if (wave > 0.2) {
+            // Neon Magenta
+            rCol = 1.0; gCol = 0.05; bCol = 0.65;
+          } else if (wave > -0.3) {
+            // Cyber Cyan
+            rCol = 0.0; gCol = 0.95; bCol = 1.0;
+          } else {
+            // Deep Neon Purple
+            rCol = 0.6; gCol = 0.1; bCol = 1.0;
+          }
+        }
+        else if (theme === 'starlight') {
+          // Radiant golden celestial star with white diamond flares
+          var p = Math.sin(t * 2.5 * CONFIG.colorSpeed + dist * 0.04);
+          if (isLarge) {
+            rCol = 1.0; gCol = 0.9 + 0.1 * p; bCol = 0.3 + 0.2 * p;
+          } else {
+            rCol = 1.0; gCol = 0.75 + 0.2 * Math.cos(t + dist * 0.02); bCol = 0.15 + 0.45 * Math.max(0, p);
+          }
+        }
+        else if (theme === 'aurora') {
+          // Polar turquoise, ethereal emerald, mystical violet
+          var wave = (t * 1.2 * CONFIG.colorSpeed + dist * 0.03) % (Math.PI * 2);
+          rCol = 0.1 + 0.35 * Math.sin(wave);
+          gCol = 0.75 + 0.25 * Math.cos(wave * 1.3);
+          bCol = 0.65 + 0.35 * Math.sin(wave + 1.2);
+          if (isLarge) { gCol = 1.0; bCol = 0.8; }
+        }
+        else if (theme === 'solar') {
+          // Solar flare: molten crimson, fiery orange, electric gold
+          var p = Math.sin(t * 3.0 * CONFIG.colorSpeed - dist * 0.045);
+          rCol = 1.0;
+          gCol = 0.3 + 0.65 * ((p + 1) * 0.5);
+          bCol = 0.08 + 0.25 * Math.max(0, p);
+          if (isLarge) { gCol = 0.9; bCol = 0.4; }
+        }
+        else if (theme === 'matrix') {
+          // Cyber matrix terminal green
+          var p = (Math.sin(t * 3.5 * CONFIG.colorSpeed + dist * 0.07) + 1) * 0.5;
+          rCol = 0.05 * p;
+          gCol = 0.7 + 0.3 * p;
+          bCol = 0.2 * p;
+          if (isLarge) { rCol = 0.4; gCol = 1.0; bCol = 0.4; }
+        }
+
+        return [Math.max(0, Math.min(1, rCol)), Math.max(0, Math.min(1, gCol)), Math.max(0, Math.min(1, bCol))];
+      }
+
+      // ----------------------------------------------------
+      // FAST 4x4 AFFINE MATRIX TRANSFORM HELPER
+      // ----------------------------------------------------
+      function applyTransform(cube, x, y, z, rx, ry, rz, s) {
+        var cx = Math.cos(rx), sx = Math.sin(rx);
+        var cy = Math.cos(ry), sy = Math.sin(ry);
+        var cz = Math.cos(rz), sz = Math.sin(rz);
+        s = s || 1.0;
+
+        var m = cube.transform.matrix;
+        m[0]  = s * (cy * cz);
+        m[1]  = s * (cy * sz);
+        m[2]  = s * (-sy);
+        m[3]  = 0;
+
+        m[4]  = s * (sx * sy * cz - cx * sz);
+        m[5]  = s * (sx * sy * sz + cx * cz);
+        m[6]  = s * (sx * cy);
+        m[7]  = 0;
+
+        m[8]  = s * (cx * sy * cz + sx * sz);
+        m[9]  = s * (cx * sy * sz - sx * cz);
+        m[10] = s * (cx * cy);
+        m[11] = 0;
+
+        m[12] = x;
+        m[13] = y;
+        m[14] = z;
+        m[15] = 1;
+      }
+
+      // ----------------------------------------------------
+      // WEB AUDIO AMBIENT SCI-FI SYNTHESIZER
+      // ----------------------------------------------------
+      var audioCtx = null;
+      var ambientGain = null;
+
+      function initAudio() {
+        try {
+          var AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (!AudioContext) return;
+          audioCtx = new AudioContext();
+
+          ambientGain = audioCtx.createGain();
+          ambientGain.gain.setValueAtTime(0.06, audioCtx.currentTime);
+          ambientGain.connect(audioCtx.destination);
+
+          // Ethereal Pentatonic Star Drone: D3, A3, E4, F#4
+          var freqs = [146.83, 220.00, 329.63, 369.99];
+          freqs.forEach(function(freq) {
+            var osc = audioCtx.createOscillator();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+
+            var lfo = audioCtx.createOscillator();
+            lfo.frequency.setValueAtTime(0.12 + Math.random() * 0.15, audioCtx.currentTime);
+            var lfoGain = audioCtx.createGain();
+            lfoGain.gain.setValueAtTime(2.0, audioCtx.currentTime);
+            lfo.connect(lfoGain);
+            lfoGain.connect(osc.frequency);
+            lfo.start();
+
+            osc.connect(ambientGain);
+            osc.start();
+          });
+        } catch (e) {
+          console.warn("Web Audio not supported:", e);
+        }
+      }
+
+      function playSfx(type) {
+        if (!CONFIG.audioEnabled || !audioCtx) return;
+        try {
+          var now = audioCtx.currentTime;
+          var osc = audioCtx.createOscillator();
+          var gain = audioCtx.createGain();
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+
+          if (type === 'burst') {
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(320, now);
+            osc.frequency.exponentialRampToValueAtTime(40, now + 0.65);
+            gain.gain.setValueAtTime(0.35, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.7);
+            osc.start(now);
+            osc.stop(now + 0.7);
+          } else {
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(587.33, now);
+            osc.frequency.exponentialRampToValueAtTime(1174.66, now + 0.35);
+            gain.gain.setValueAtTime(0.12, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+            osc.start(now);
+            osc.stop(now + 0.4);
+          }
+        } catch (e) {}
+      }
+
+      // ----------------------------------------------------
+      // STARBURST KINETIC TRIGGER (Explosion & Reformation)
+      // ----------------------------------------------------
+      function triggerStarburst() {
+        CONFIG.isBurst = true;
+        CONFIG.burstTime = performance.now();
+        playSfx('burst');
+        showToast("💥 KINETIC STARBURST EXPLOSION!");
+
+        for (var i = 0; i < cubes.length; i++) {
+          var d = cubeData[i];
+          var dist = Math.sqrt(d.currX * d.currX + d.currY * d.currY + d.currZ * d.currZ) + 1;
+          var speed = 140 + Math.random() * 150;
+          d.burstVx = (d.currX / dist) * speed + (Math.random() - 0.5) * 90;
+          d.burstVy = (d.currY / dist) * speed + (Math.random() - 0.5) * 90;
+          d.burstVz = (d.currZ / dist) * speed + (Math.random() - 0.5) * 90;
+        }
+      }
+
+      // ----------------------------------------------------
+      // REAL-TIME KINETIC ANIMATION LOOP
+      // ----------------------------------------------------
+      var lastTimestamp = performance.now();
+      var frameCount = 0;
+      var lastFpsUpdate = performance.now();
+
+      function updateStarScene(timestamp) {
+        var delta = (timestamp - lastTimestamp) * 0.001;
+        if (delta > 0.1) delta = 0.1;
+        lastTimestamp = timestamp;
+
+        var t = (timestamp * 0.001);
+
+        // Auto camera orbit
+        if (CONFIG.autoOrbit && r && r.camera) {
+          r.camera.rotate([0.65, 0]);
+        }
+
+        // Starburst explosion progress (sine ease blast & magnetic snap)
+        var burstFactor = 0;
+        if (CONFIG.isBurst) {
+          var elapsed = (timestamp - CONFIG.burstTime) * 0.001;
+          if (elapsed > 1.9) {
+            CONFIG.isBurst = false;
+          } else {
+            burstFactor = Math.sin((elapsed / 1.9) * Math.PI);
+          }
+        }
+
+        // Iterate over all cubes in the star
+        for (var i = 0; i < cubes.length; i++) {
+          var d = cubeData[i];
+          var cube = cubes[i];
+
+          var targetX = d.origX;
+          var targetY = d.origY;
+          var targetZ = 0;
+          var rotX = d.currRotX;
+          var rotY = d.currRotY;
+          var rotZ = d.currRotZ;
+          var scale = 1.0;
+
+          // ==================================================
+          // 1. ROTATING LARGER CUBES (Center & 5 Star Spines)
+          // As requested in the drawing: "[ ] = Rotate"
+          // ==================================================
+          if (d.role === 'large_rotating') {
+            var spinRate = CONFIG.rotSpeed * 2.5;
+
+            // Individual multi-axis rotation with phase twist along each arm
+            var phase = d.step * 0.35;
+            rotX += (0.025 + d.step * 0.004) * spinRate;
+            rotY += (0.035 + d.step * 0.006) * spinRate;
+            rotZ += (0.020 + d.step * 0.003) * spinRate;
+
+            // Breathing pulse on the core
+            scale = 1.0 + Math.sin(t * 3.0 + phase) * 0.12;
+
+            // 3D Dimensional Elevation
+            if (CONFIG.mode === 'crystal') {
+              // Elevate the central spine into 3D faceted crystal
+              var elevation = (1.0 - (d.distFromCenter / R_OUTER)) * 38 * CONFIG.depth3D;
+              targetZ = elevation;
+            } else if (CONFIG.mode === 'wave') {
+              targetZ = Math.sin(d.distFromCenter * 0.06 - t * 3.5) * 25 * CONFIG.depth3D;
+            } else if (CONFIG.mode === 'vortex') {
+              var swirl = (d.distFromCenter * 0.008) * Math.sin(t * 1.5);
+              var curAngle = Math.atan2(d.origY, d.origX) + swirl;
+              targetX = Math.cos(curAngle) * d.distFromCenter;
+              targetY = Math.sin(curAngle) * d.distFromCenter;
+              targetZ = Math.sin(t * 2.5 + d.step) * 20 * CONFIG.depth3D;
+            } else if (CONFIG.mode === 'solar') {
+              targetZ = (Math.random() - 0.5) * 8 * CONFIG.depth3D;
+            }
+          }
+
+          // ==================================================
+          // 2. STAR PERIMETER BOUNDARY CUBES
+          // As requested in the drawing: "[ ] = Colors change"
+          // ==================================================
+          else if (d.role === 'star_outline') {
+            // Subtle breathing orientation
+            rotX = Math.sin(t * 2.0 + d.distFromCenter * 0.05) * 0.2;
+            rotY = Math.cos(t * 2.0 + d.distFromCenter * 0.05) * 0.2;
+
+            if (CONFIG.mode === 'crystal') {
+              // Beveled star edge
+              var zNotch = (d.distFromCenter < R_INNER + 15) ? -15 : 8;
+              targetZ = zNotch * CONFIG.depth3D;
+            } else if (CONFIG.mode === 'wave') {
+              targetZ = Math.sin(d.distFromCenter * 0.06 - t * 3.5) * 25 * CONFIG.depth3D;
+            } else if (CONFIG.mode === 'vortex') {
+              var swirl = (d.distFromCenter * 0.008) * Math.sin(t * 1.5);
+              var curAngle = Math.atan2(d.origY, d.origX) + swirl;
+              targetX = Math.cos(curAngle) * d.distFromCenter;
+              targetY = Math.sin(curAngle) * d.distFromCenter;
+              targetZ = Math.sin(t * 2.0 + d.edgePos * Math.PI) * 15 * CONFIG.depth3D;
+            }
+          }
+
+          // ==================================================
+          // 3. TRAILS OF CUBES EXTENDING OUTWARD FROM CENTER
+          // "with trails of cubes extending outward from the center"
+          // ==================================================
+          else if (d.role === 'flying_trail') {
+            var speed = CONFIG.trailSpeed * 1.2;
+            // Advance trail progress from 0.0 (center) to 1.0 (past tips)
+            d.trailProgress = (d.trailProgress + delta * 0.28 * speed) % 1.0;
+
+            // Travel from center to beyond the tips
+            var maxDistance = R_OUTER * 1.45;
+            var currentDist = d.trailProgress * maxDistance;
+
+            // Path along the ray with subtle 3D spiral twist
+            var tip = TIPS[d.rayIdx];
+            var spiralAngle = d.trailProgress * Math.PI * 4;
+            var spiralRadius = Math.sin(d.trailProgress * Math.PI) * 14;
+
+            targetX = d.dirX * currentDist - d.dirY * (Math.sin(spiralAngle) * spiralRadius);
+            targetY = d.dirY * currentDist + d.dirX * (Math.sin(spiralAngle) * spiralRadius);
+            targetZ = Math.cos(spiralAngle) * spiralRadius * CONFIG.depth3D;
+
+            // Fast kinetic tumble for flying cubes
+            rotX += 0.06 * CONFIG.rotSpeed;
+            rotY += 0.08 * CONFIG.rotSpeed;
+            rotZ += 0.05 * CONFIG.rotSpeed;
+
+            // Scale shrinks as they shoot out into deep space
+            scale = (1.1 - d.trailProgress * 0.5);
+            d.distFromCenter = currentDist;
+          }
+
+          // Smooth interpolation for fluid morphing
+          var lerp = 0.12;
+          d.currX += (targetX - d.currX) * lerp;
+          d.currY += (targetY - d.currY) * lerp;
+          d.currZ += (targetZ - d.currZ) * lerp;
+          d.currRotX = rotX;
+          d.currRotY = rotY;
+          d.currRotZ = rotZ;
+
+          // Apply starburst explosion offset
+          var finalX = d.currX;
+          var finalY = d.currY;
+          var finalZ = d.currZ;
+          if (burstFactor > 0) {
+            finalX += d.burstVx * burstFactor;
+            finalY += d.burstVy * burstFactor;
+            finalZ += d.burstVz * burstFactor;
+            scale *= (1.0 + burstFactor * 0.5);
+          }
+
+          // Apply 4x4 Transformation Matrix
+          applyTransform(cube, finalX, finalY, finalZ, d.currRotX, d.currRotY, d.currRotZ, scale);
+
+          // Update Dynamic Colors ("cubes should continuously change colors")
+          var dist = Math.sqrt(finalX * finalX + finalY * finalY + finalZ * finalZ);
+          var isLarge = (d.role === 'large_rotating');
+          cube.color = calculateCubeColor(CONFIG.theme, t, dist, isLarge, d.role, d.rayIdx);
+        }
+
+        // Live FPS update
+        frameCount++;
+        if (timestamp - lastFpsUpdate >= 1000) {
+          var fps = Math.round((frameCount * 1000) / (timestamp - lastFpsUpdate));
+          document.getElementById('fps-display').textContent = fps + ' FPS';
+          frameCount = 0;
+          lastFpsUpdate = timestamp;
+        }
+      }
+
+      // ----------------------------------------------------
+      // DUAL-LOOP RENDERING DRIVER
+      // ----------------------------------------------------
+      var xtkAutoRenders = false;
+
+      r.onRender = function() {
+        xtkAutoRenders = true;
+        updateStarScene(performance.now());
+      };
+
+      function animLoop(time) {
+        requestAnimationFrame(animLoop);
+        updateStarScene(time);
+        if (!xtkAutoRenders && r) {
+          r.render();
+        }
+      }
+      requestAnimationFrame(animLoop);
+
+      // ----------------------------------------------------
+      // TOAST NOTIFIER
+      // ----------------------------------------------------
+      var toastTimer = null;
+      function showToast(text) {
+        var toast = document.getElementById('toast');
+        toast.textContent = text;
+        toast.classList.add('show');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(function() {
+          toast.classList.remove('show');
+        }, 2200);
+      }
+
+      // ----------------------------------------------------
+      // UI BUTTONS & EVENT HANDLERS
+      // ----------------------------------------------------
+      // Mode buttons
+      var modeButtons = document.querySelectorAll('[data-mode]');
+      modeButtons.forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          setMode(this.getAttribute('data-mode'));
+        });
+      });
+
+      function setMode(modeName) {
+        CONFIG.mode = modeName;
+        modeButtons.forEach(function(b) {
+          b.classList.toggle('active', b.getAttribute('data-mode') === modeName);
+        });
+        var readable = {
+          sketch: '2D Sketch Match',
+          crystal: '3D Crystal Star',
+          wave: 'Star Wave',
+          vortex: 'Cosmic Vortex',
+          solar: 'Solar Flare',
+          orbit: 'Satellite Swarm'
+        }[modeName] || modeName;
+        playSfx('chime');
+        showToast("⭐ MODE: " + readable.toUpperCase());
+      }
+
+      // Color Theme buttons
+      var themeButtons = document.querySelectorAll('[data-theme]');
+      themeButtons.forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          setTheme(this.getAttribute('data-theme'));
+        });
+      });
+
+      function setTheme(themeName) {
+        CONFIG.theme = themeName;
+        themeButtons.forEach(function(b) {
+          b.classList.toggle('active', b.getAttribute('data-theme') === themeName);
+        });
+        playSfx('chime');
+        showToast("🎨 COLOR: " + themeName.toUpperCase());
+      }
+
+      // Sliders
+      document.getElementById('slider-rot').addEventListener('input', function(e) {
+        CONFIG.rotSpeed = parseFloat(e.target.value);
+        document.getElementById('val-rot').textContent = CONFIG.rotSpeed.toFixed(1) + 'x';
+      });
+
+      document.getElementById('slider-color').addEventListener('input', function(e) {
+        CONFIG.colorSpeed = parseFloat(e.target.value);
+        document.getElementById('val-color').textContent = CONFIG.colorSpeed.toFixed(1) + 'x';
+      });
+
+      document.getElementById('slider-trail').addEventListener('input', function(e) {
+        CONFIG.trailSpeed = parseFloat(e.target.value);
+        document.getElementById('val-trail').textContent = CONFIG.trailSpeed.toFixed(1) + 'x';
+      });
+
+      document.getElementById('slider-depth').addEventListener('input', function(e) {
+        CONFIG.depth3D = parseFloat(e.target.value);
+        document.getElementById('val-depth').textContent = CONFIG.depth3D.toFixed(1) + 'x';
+      });
+
+      // Kinetic Starburst Trigger
+      document.getElementById('btn-burst').addEventListener('click', triggerStarburst);
+
+      // Top-Down Sketch Perspective (Faces star directly as in paper drawing)
+      document.getElementById('btn-top-view').addEventListener('click', function() {
+        r.camera.position = [0, 0, 310];
+        r.camera.focus = [0, 0, 0];
+        r.camera.up = [0, 1, 0];
+        showToast("📐 2D SKETCH VIEW (TOP-DOWN)");
+      });
+
+      // 3D Angled Perspective
+      document.getElementById('btn-iso-view').addEventListener('click', function() {
+        r.camera.position = [0, -180, 240];
+        r.camera.focus = [0, 0, 0];
+        r.camera.up = [0, 0, 1];
+        showToast("📐 3D PERSPECTIVE VIEW");
+      });
+
+      // Camera Orbit Toggle
+      var btnOrbit = document.getElementById('btn-orbit');
+      btnOrbit.addEventListener('click', function() {
+        CONFIG.autoOrbit = !CONFIG.autoOrbit;
+        this.textContent = '🎥 Orbit: ' + (CONFIG.autoOrbit ? 'ON' : 'OFF');
+        this.classList.toggle('active', CONFIG.autoOrbit);
+        showToast("CAMERA ORBIT: " + (CONFIG.autoOrbit ? 'ENABLED' : 'DISABLED'));
+      });
+
+      // Audio Toggle
+      var btnAudio = document.getElementById('btn-audio');
+      btnAudio.addEventListener('click', function() {
+        CONFIG.audioEnabled = !CONFIG.audioEnabled;
+        if (CONFIG.audioEnabled) {
+          if (!audioCtx) initAudio();
+          if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+          this.textContent = '🔊 Audio: ON';
+          this.classList.add('active');
+          showToast("AMBIENT SYNTH ACTIVATED");
+        } else {
+          if (audioCtx && audioCtx.state === 'running') audioCtx.suspend();
+          this.textContent = '🔊 Audio: OFF';
+          this.classList.remove('active');
+          showToast("AUDIO MUTED");
+        }
+      });
+
+      // Scene Export JSON via loader.js download()
+      document.getElementById('btn-export').addEventListener('click', function() {
+        if (typeof download === 'function') {
+          showToast("EXPORTING SCENE.JSON...");
+          download();
+        } else {
+          alert("loader.js download() function not found.");
+        }
+      });
+
+      // Scene Import JSON via loader.js upload()
+      var sceneFileInput = document.getElementById('scene-file-input');
+      document.getElementById('btn-import').addEventListener('click', function() {
+        sceneFileInput.click();
+      });
+
+      sceneFileInput.addEventListener('change', function(e) {
+        var file = e.target.files[0];
+        if (!file) return;
+        var reader = new FileReader();
+        reader.onload = function(evt) {
+          try {
+            var url = URL.createObjectURL(file);
+            if (typeof upload === 'function') {
+              showToast("IMPORTING SCENE...");
+              upload(url);
+            }
+          } catch (err) {
+            alert("Error loading scene: " + err);
+          }
+        };
+        reader.readAsText(file);
+      });
+
+      // HUD Toggle
+      var hud = document.getElementById('hud');
+      document.getElementById('hud-close-btn').addEventListener('click', function() {
+        hud.classList.add('collapsed');
+      });
+      document.getElementById('toggle-hud-btn').addEventListener('click', function() {
+        hud.classList.remove('collapsed');
+      });
+
+      // Keyboard Controls
+      window.addEventListener('keydown', function(e) {
+        if (e.code === 'Space') {
+          e.preventDefault();
+          triggerStarburst();
+        } else if (e.key === 'm' || e.key === 'M') {
+          var modes = ['sketch', 'crystal', 'wave', 'vortex', 'solar', 'orbit'];
+          var nextIdx = (modes.indexOf(CONFIG.mode) + 1) % modes.length;
+          setMode(modes[nextIdx]);
+        } else if (e.key === 'c' || e.key === 'C') {
+          var themes = ['prismatic', 'synthwave', 'starlight', 'aurora', 'solar', 'matrix'];
+          var nextIdx = (themes.indexOf(CONFIG.theme) + 1) % themes.length;
+          setTheme(themes[nextIdx]);
+        } else if (e.key === 'o' || e.key === 'O') {
+          btnOrbit.click();
+        } else if (e.key === 'v' || e.key === 'V') {
+          if (r.camera.position[2] > 280) {
+            document.getElementById('btn-iso-view').click();
+          } else {
+            document.getElementById('btn-top-view').click();
+          }
+        } else if (e.key === 's' || e.key === 'S') {
+          document.getElementById('btn-export').click();
+        }
+      });
+    };
+  </script>
+</body>
+</html>

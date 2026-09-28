@@ -1,0 +1,1364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>XTK WebGL Cube Art Visualization - CS460</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Space+Grotesk:wght@400;600&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --bg-dark: #060810;
+      --panel-bg: rgba(13, 17, 28, 0.78);
+      --panel-border: rgba(99, 140, 255, 0.28);
+      --accent-cyan: #00f2fe;
+      --accent-magenta: #ff007f;
+      --accent-purple: #7928ca;
+      --accent-gold: #ffb703;
+      --accent-green: #00ff88;
+      --text-main: #f0f4ff;
+      --text-dim: #8b9bb4;
+      --glow-cyan: 0 0 15px rgba(0, 242, 254, 0.45);
+      --glow-magenta: 0 0 15px rgba(255, 0, 127, 0.45);
+    }
+
+    * {
+      box-sizing: border-box;
+      user-select: none;
+    }
+
+    html, body {
+      background-color: var(--bg-dark);
+      background-image: 
+        radial-gradient(circle at 50% 50%, rgba(20, 30, 55, 0.6) 0%, transparent 80%),
+        radial-gradient(circle at 80% 20%, rgba(121, 40, 202, 0.15) 0%, transparent 50%),
+        radial-gradient(circle at 20% 80%, rgba(0, 242, 254, 0.12) 0%, transparent 50%);
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      width: 100%;
+      overflow: hidden;
+      font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+      color: var(--text-main);
+    }
+
+    /* Fullscreen canvas container */
+    #container {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
+
+    /* Canvas styling */
+    canvas {
+      width: 100% !important;
+      height: 100% !important;
+      outline: none;
+      display: block;
+    }
+
+    /* Ambient background star particles */
+    .bg-grid {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 2;
+      opacity: 0.18;
+      background-size: 50px 50px;
+      background-image: 
+        linear-gradient(to right, rgba(255, 255, 255, 0.08) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+    }
+
+    /* Glassmorphism Control Panel */
+    #hud {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      z-index: 10;
+      width: 320px;
+      max-height: calc(100vh - 40px);
+      overflow-y: auto;
+      background: var(--panel-bg);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid var(--panel-border);
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.65), 0 0 20px rgba(0, 242, 254, 0.08);
+      transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+    }
+
+    #hud::-webkit-scrollbar {
+      width: 5px;
+    }
+    #hud::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 10px;
+    }
+
+    #hud.collapsed {
+      transform: translateX(-340px);
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    /* Toggle Panel Button */
+    #toggle-hud-btn {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      z-index: 11;
+      background: var(--panel-bg);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--panel-border);
+      border-radius: 10px;
+      color: var(--accent-cyan);
+      font-size: 14px;
+      font-family: 'Orbitron', monospace;
+      padding: 8px 14px;
+      cursor: pointer;
+      display: none;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+    }
+    #hud.collapsed + #toggle-hud-btn {
+      display: block;
+    }
+
+    /* Header & Branding */
+    .hud-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding-bottom: 12px;
+      margin-bottom: 16px;
+    }
+
+    .brand-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 15px;
+      font-weight: 900;
+      letter-spacing: 1.5px;
+      background: linear-gradient(135deg, var(--accent-cyan), #fff, var(--accent-magenta));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-transform: uppercase;
+    }
+
+    .brand-badge {
+      font-family: 'Orbitron', monospace;
+      font-size: 10px;
+      background: rgba(0, 242, 254, 0.15);
+      border: 1px solid rgba(0, 242, 254, 0.4);
+      color: var(--accent-cyan);
+      padding: 2px 7px;
+      border-radius: 20px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+    }
+
+    .hud-close {
+      cursor: pointer;
+      color: var(--text-dim);
+      font-size: 18px;
+      line-height: 1;
+      transition: color 0.2s;
+    }
+    .hud-close:hover {
+      color: var(--accent-magenta);
+    }
+
+    /* Section styling */
+    .hud-section {
+      margin-bottom: 18px;
+    }
+
+    .section-title {
+      font-family: 'Orbitron', monospace;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--accent-cyan);
+      margin-bottom: 9px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .section-title::before {
+      content: '';
+      display: inline-block;
+      width: 4px;
+      height: 11px;
+      background: var(--accent-cyan);
+      border-radius: 2px;
+    }
+
+    /* Button grids */
+    .btn-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 7px;
+    }
+
+    .btn-grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+    }
+
+    button.hud-btn {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 8px;
+      color: var(--text-main);
+      padding: 8px 10px;
+      font-size: 11px;
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.22s ease;
+      outline: none;
+      text-align: center;
+    }
+
+    button.hud-btn:hover {
+      background: rgba(0, 242, 254, 0.15);
+      border-color: var(--accent-cyan);
+      color: #fff;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0, 242, 254, 0.25);
+    }
+
+    button.hud-btn.active {
+      background: linear-gradient(135deg, rgba(0, 242, 254, 0.3), rgba(121, 40, 202, 0.3));
+      border-color: var(--accent-cyan);
+      color: #fff;
+      box-shadow: var(--glow-cyan);
+    }
+
+    /* Action Shockwave button */
+    button.btn-shockwave {
+      grid-column: span 2;
+      background: linear-gradient(135deg, rgba(255, 0, 127, 0.25), rgba(121, 40, 202, 0.35));
+      border: 1px solid rgba(255, 0, 127, 0.6);
+      color: #fff;
+      font-family: 'Orbitron', monospace;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      padding: 10px;
+      margin-top: 4px;
+      box-shadow: var(--glow-magenta);
+    }
+
+    button.btn-shockwave:hover {
+      background: linear-gradient(135deg, rgba(255, 0, 127, 0.45), rgba(121, 40, 202, 0.55));
+      border-color: #ff3399;
+      box-shadow: 0 0 22px rgba(255, 0, 127, 0.7);
+      transform: translateY(-2px);
+    }
+
+    /* Sliders */
+    .slider-row {
+      margin-bottom: 11px;
+    }
+
+    .slider-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-bottom: 4px;
+      font-weight: 500;
+    }
+
+    .slider-header .val {
+      color: var(--accent-cyan);
+      font-family: 'Orbitron', monospace;
+      font-weight: 700;
+    }
+
+    input[type=range] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 5px;
+      border-radius: 5px;
+      background: rgba(255, 255, 255, 0.12);
+      outline: none;
+      margin: 0;
+    }
+
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--accent-cyan);
+      cursor: pointer;
+      box-shadow: 0 0 8px var(--accent-cyan);
+      transition: transform 0.15s;
+    }
+
+    input[type=range]::-webkit-slider-thumb:hover {
+      transform: scale(1.3);
+    }
+
+    /* Footer Stats & Info */
+    #stats-panel {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      z-index: 10;
+      background: var(--panel-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--panel-border);
+      border-radius: 12px;
+      padding: 12px 18px;
+      font-family: 'Space Grotesk', monospace;
+      font-size: 11px;
+      color: var(--text-dim);
+      display: flex;
+      gap: 18px;
+      align-items: center;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+    }
+
+    .stat-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .stat-label {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-dim);
+    }
+
+    .stat-val {
+      font-family: 'Orbitron', monospace;
+      font-size: 13px;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .stat-val.accent {
+      color: var(--accent-cyan);
+    }
+    .stat-val.magenta {
+      color: var(--accent-magenta);
+    }
+
+    /* Hotkey helper pill */
+    #hotkey-pill {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      z-index: 10;
+      background: var(--panel-bg);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--panel-border);
+      border-radius: 20px;
+      padding: 7px 15px;
+      font-size: 11px;
+      color: var(--text-dim);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .kbd {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+      padding: 1px 6px;
+      font-family: 'Orbitron', monospace;
+      font-size: 9px;
+      color: var(--accent-cyan);
+    }
+
+    /* Hidden file input for scene upload */
+    #scene-file-input {
+      display: none;
+    }
+
+    /* Notification toast */
+    #toast {
+      position: absolute;
+      top: 25px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-100px);
+      background: rgba(13, 17, 28, 0.92);
+      border: 1px solid var(--accent-cyan);
+      box-shadow: var(--glow-cyan);
+      border-radius: 25px;
+      padding: 10px 22px;
+      font-family: 'Orbitron', monospace;
+      font-size: 12px;
+      color: #fff;
+      z-index: 100;
+      pointer-events: none;
+      transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s;
+      opacity: 0;
+    }
+
+    #toast.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+  </style>
+
+  <!-- Load XTK WebGL Framework -->
+  <script type="text/javascript" src="https://get.goXTK.com/xtk_edge.js"></script>
+  <!-- Load Scene Exporter / Importer (CS460 loader.js) -->
+  <script type="text/javascript" src="loader.js"></script>
+</head>
+<body>
+
+  <!-- Background decorative grid -->
+  <div class="bg-grid"></div>
+
+  <!-- Main 3D WebGL Container -->
+  <div id="container"></div>
+
+  <!-- Notification Toast -->
+  <div id="toast">FORMATION MORPHED</div>
+
+  <!-- Floating HUD Glass Panel -->
+  <div id="hud">
+    <div class="hud-header">
+      <div>
+        <div class="brand-title">Cube Artistry</div>
+        <div style="font-size: 10px; color: var(--text-dim); margin-top: 2px;">XTK 3D WebGL Kinetic Sculpture</div>
+      </div>
+      <span class="brand-badge">CS460</span>
+      <span class="hud-close" id="hud-close-btn" title="Minimize panel">×</span>
+    </div>
+
+    <!-- Sculpture Formations -->
+    <div class="hud-section">
+      <div class="section-title">Formations</div>
+      <div class="btn-grid">
+        <button class="hud-btn active" data-mode="wave">🌊 Matrix Wave</button>
+        <button class="hud-btn" data-mode="spiral">🌌 Cosmic Vortex</button>
+        <button class="hud-btn" data-mode="sphere">🔮 Celestial Core</button>
+        <button class="hud-btn" data-mode="city">🏙️ Metropolis</button>
+        <button class="hud-btn" data-mode="torus">🍩 Quantum Torus</button>
+        <button class="hud-btn" data-mode="swarm">💫 Supernova</button>
+      </div>
+    </div>
+
+    <!-- Dynamic Color Schemes -->
+    <div class="hud-section">
+      <div class="section-title">Color Palettes</div>
+      <div class="btn-grid-3">
+        <button class="hud-btn active" data-theme="synthwave">🔮 Synth</button>
+        <button class="hud-btn" data-theme="aurora">🌿 Aurora</button>
+        <button class="hud-btn" data-theme="solar">🔥 Solar</button>
+        <button class="hud-btn" data-theme="prismatic">🌈 Prism</button>
+        <button class="hud-btn" data-theme="biolum">🌊 Abyss</button>
+        <button class="hud-btn" data-theme="matrix">💻 Matrix</button>
+      </div>
+    </div>
+
+    <!-- Real-time Motion Sliders -->
+    <div class="hud-section">
+      <div class="section-title">Dynamics & Motion</div>
+      
+      <div class="slider-row">
+        <div class="slider-header">
+          <span>Animation Speed</span>
+          <span class="val" id="val-speed">1.0x</span>
+        </div>
+        <input type="range" id="slider-speed" min="0.2" max="3.0" step="0.1" value="1.0">
+      </div>
+
+      <div class="slider-row">
+        <div class="slider-header">
+          <span>Wave Amplitude</span>
+          <span class="val" id="val-wave">1.0x</span>
+        </div>
+        <input type="range" id="slider-wave" min="0.2" max="2.5" step="0.1" value="1.0">
+      </div>
+
+      <div class="slider-row">
+        <div class="slider-header">
+          <span>Cube Rotation Speed</span>
+          <span class="val" id="val-spin">1.0x</span>
+        </div>
+        <input type="range" id="slider-spin" min="0.0" max="3.0" step="0.1" value="1.0">
+      </div>
+
+      <div class="slider-row">
+        <div class="slider-header">
+          <span>Flying Swarm Velocity</span>
+          <span class="val" id="val-scout">1.2x</span>
+        </div>
+        <input type="range" id="slider-scout" min="0.2" max="3.0" step="0.1" value="1.2">
+      </div>
+    </div>
+
+    <!-- Actions & Features -->
+    <div class="hud-section">
+      <div class="section-title">Kinetic Triggers</div>
+      <div class="btn-grid">
+        <button class="hud-btn btn-shockwave" id="btn-shockwave">💥 TRIGGER SHOCKWAVE</button>
+        <button class="hud-btn" id="btn-tour">🔄 Auto-Tour: OFF</button>
+        <button class="hud-btn" id="btn-orbit">🎥 Orbit: OFF</button>
+        <button class="hud-btn" id="btn-audio">🔊 Synth: OFF</button>
+        <button class="hud-btn" id="btn-reset-cam">📐 Reset View</button>
+      </div>
+    </div>
+
+    <!-- Scene Persistence (loader.js integration) -->
+    <div class="hud-section">
+      <div class="section-title">Scene Storage</div>
+      <div class="btn-grid">
+        <button class="hud-btn" id="btn-export">💾 Save Scene JSON</button>
+        <button class="hud-btn" id="btn-import">📂 Load Scene JSON</button>
+      </div>
+      <input type="file" id="scene-file-input" accept=".json">
+    </div>
+  </div>
+
+  <!-- Collapsed Panel Opener -->
+  <button id="toggle-hud-btn">⚙ CONTROLS</button>
+
+  <!-- Live Stats Panel -->
+  <div id="stats-panel">
+    <div class="stat-item">
+      <span class="stat-label">Frame Rate</span>
+      <span class="stat-val accent" id="fps-display">60 FPS</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-label">Total Cubes</span>
+      <span class="stat-val" id="cube-count-display">200</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-label">State</span>
+      <span class="stat-val magenta" id="state-display">Wave Grid</span>
+    </div>
+  </div>
+
+  <!-- Keyboard Shortcuts Bar -->
+  <div id="hotkey-pill">
+    <span><span class="kbd">SPACE</span> Shockwave</span>
+    <span><span class="kbd">M</span> Mode</span>
+    <span><span class="kbd">C</span> Palette</span>
+    <span><span class="kbd">O</span> Orbit</span>
+    <span><span class="kbd">S</span> Save JSON</span>
+  </div>
+
+  <!-- Main Visualization JavaScript -->
+  <script type="text/javascript">
+    // Global XTK renderer and cameras for compatibility with loader.js
+    var r = null;
+    var CAMERAS = [];
+
+    window.onload = function() {
+      // 1. Initialize XTK 3D Renderer
+      r = new X.renderer3D();
+      r.container = 'container';
+      r.init();
+
+      // Camera initial positioning
+      r.camera.position = [0, -220, 260];
+      r.camera.focus = [0, 0, 0];
+      r.camera.up = [0, 0, 1];
+
+      // Expose to loader.js
+      if (typeof CAMERAS !== 'undefined') {
+        CAMERAS = [r.camera.view];
+      }
+
+      // ----------------------------------------------------
+      // ART STATE & CONFIGURATION
+      // ----------------------------------------------------
+      var CONFIG = {
+        mode: 'wave',           // 'wave', 'spiral', 'sphere', 'city', 'torus', 'swarm'
+        theme: 'synthwave',     // 'synthwave', 'aurora', 'solar', 'prismatic', 'biolum', 'matrix'
+        speed: 1.0,
+        waveAmp: 1.0,
+        spinSpeed: 1.0,
+        scoutVelocity: 1.2,
+        autoTour: false,
+        autoOrbit: false,
+        audioEnabled: false,
+        isShockwave: false,
+        shockwaveTime: 0
+      };
+
+      var NUM_GRID = 13;
+      var NUM_SCULPTURE = NUM_GRID * NUM_GRID; // 169 structure cubes
+      var NUM_SCOUTS = 31;                     // 31 dynamic flying scout cubes
+      var TOTAL_CUBES = NUM_SCULPTURE + NUM_SCOUTS; // 200 cubes total
+
+      var cubes = [];
+      var cubeData = []; // Internal animation state per cube
+
+      // ----------------------------------------------------
+      // PROCEDURAL CUBE GENERATION
+      // ----------------------------------------------------
+      for (var i = 0; i < TOTAL_CUBES; i++) {
+        var cube = new X.cube();
+        var isScout = (i >= NUM_SCULPTURE);
+
+        // Sculpture cubes vs fast flying scout cubes
+        if (isScout) {
+          cube.lengthX = 7 + Math.random() * 5;
+          cube.lengthY = 7 + Math.random() * 5;
+          cube.lengthZ = 7 + Math.random() * 5;
+          cube.color = [0.0, 1.0, 0.9];
+        } else {
+          cube.lengthX = 13;
+          cube.lengthY = 13;
+          cube.lengthZ = 13;
+          cube.color = [1.0, 0.1, 0.6];
+        }
+
+        // Add to XTK renderer
+        r.add(cube);
+        cubes.push(cube);
+
+        // Store animation state
+        cubeData.push({
+          index: i,
+          isScout: isScout,
+          gridX: (i % NUM_GRID) - Math.floor(NUM_GRID / 2),
+          gridY: Math.floor(i / NUM_GRID) - Math.floor(NUM_GRID / 2),
+          // Current rendered position and rotations
+          currX: (Math.random() - 0.5) * 200,
+          currY: (Math.random() - 0.5) * 200,
+          currZ: (Math.random() - 0.5) * 200,
+          currRotX: Math.random() * Math.PI * 2,
+          currRotY: Math.random() * Math.PI * 2,
+          currRotZ: Math.random() * Math.PI * 2,
+          // Target position (interpolated to create smooth morphing)
+          targetX: 0,
+          targetY: 0,
+          targetZ: 0,
+          targetRotX: 0,
+          targetRotY: 0,
+          targetRotZ: 0,
+          // Explosion burst physics
+          burstVx: 0,
+          burstVy: 0,
+          burstVz: 0,
+          // Flying scout random orbit seeds
+          orbitRadiusA: 90 + Math.random() * 80,
+          orbitRadiusB: 70 + Math.random() * 90,
+          orbitSpeed: (0.4 + Math.random() * 0.7) * (Math.random() > 0.5 ? 1 : -1),
+          orbitPhase: Math.random() * Math.PI * 2,
+          orbitTiltX: Math.random() * Math.PI,
+          orbitTiltY: Math.random() * Math.PI
+        });
+      }
+
+      // Initial render call
+      r.render();
+
+      // ----------------------------------------------------
+      // COLOR THEME GENERATOR (Vibrant Cosine & Spectral Math)
+      // ----------------------------------------------------
+      function getColor(theme, t, dist, normalizedIdx) {
+        var r = 1, g = 1, b = 1;
+
+        if (theme === 'synthwave') {
+          // Hot pink, electric purple, cyber cyan
+          var wave = Math.sin(t * 1.5 + dist * 0.04);
+          if (wave < -0.2) {
+            // Neon Magenta
+            r = 1.0; g = 0.05 + 0.1 * Math.cos(t); b = 0.55;
+          } else if (wave < 0.4) {
+            // Deep Purple / Violet
+            r = 0.55; g = 0.1; b = 1.0;
+          } else {
+            // Electric Cyan
+            r = 0.0; g = 0.92; b = 1.0;
+          }
+        } 
+        else if (theme === 'aurora') {
+          // Ethereal emerald, polar turquoise, twilight violet
+          var p = (t * 0.6 + dist * 0.03) % (Math.PI * 2);
+          r = 0.1 + 0.35 * Math.sin(p);
+          g = 0.7 + 0.3 * Math.cos(p * 1.2);
+          b = 0.6 + 0.4 * Math.sin(p + 1.5);
+        }
+        else if (theme === 'solar') {
+          // Blazing crimson, molten orange, white-hot gold
+          var p = Math.sin(t * 2.0 - dist * 0.05);
+          r = 1.0;
+          g = 0.2 + 0.6 * ((p + 1) * 0.5);
+          b = 0.05 + 0.3 * Math.max(0, p);
+        }
+        else if (theme === 'prismatic') {
+          // Full continuous rainbow spectrum
+          var hue = (t * 0.35 + dist * 0.015 + normalizedIdx * 0.5) % 1.0;
+          if (hue < 0) hue += 1.0;
+          // HSV to RGB conversion
+          var h6 = hue * 6;
+          var f = h6 - Math.floor(h6);
+          var q = 1 - f;
+          switch (Math.floor(h6) % 6) {
+            case 0: r = 1; g = f; b = 0; break;
+            case 1: r = q; g = 1; b = 0; break;
+            case 2: r = 0; g = 1; b = f; break;
+            case 3: r = 0; g = q; b = 1; break;
+            case 4: r = f; g = 0; b = 1; break;
+            case 5: r = 1; g = 0; b = q; break;
+          }
+        }
+        else if (theme === 'biolum') {
+          // Deep abyss sapphire, bioluminescent aqua, marine teal
+          var wave = Math.sin(t * 1.2 + dist * 0.05);
+          r = 0.05 + 0.15 * Math.max(0, wave);
+          g = 0.45 + 0.5 * Math.sin(t * 0.8 + dist * 0.03);
+          b = 0.85 + 0.15 * Math.cos(t + dist * 0.02);
+        }
+        else if (theme === 'matrix') {
+          // Phosphor digital green, cyber terminal glow
+          var pulse = (Math.sin(t * 3.0 + dist * 0.08) + 1) * 0.5;
+          r = 0.05 * pulse;
+          g = 0.65 + 0.35 * pulse;
+          b = 0.2 * pulse;
+        }
+
+        return [Math.max(0, Math.min(1, r)), Math.max(0, Math.min(1, g)), Math.max(0, Math.min(1, b))];
+      }
+
+      // ----------------------------------------------------
+      // 4x4 MATRIX COMPUTATION (Transforms cube directly)
+      // ----------------------------------------------------
+      function applyTransformMatrix(cube, x, y, z, rx, ry, rz, scale) {
+        var cx = Math.cos(rx), sx = Math.sin(rx);
+        var cy = Math.cos(ry), sy = Math.sin(ry);
+        var cz = Math.cos(rz), sz = Math.sin(rz);
+        var s = scale || 1.0;
+
+        var m = cube.transform.matrix;
+        // Column 0
+        m[0]  = s * (cy * cz);
+        m[1]  = s * (cy * sz);
+        m[2]  = s * (-sy);
+        m[3]  = 0;
+        // Column 1
+        m[4]  = s * (sx * sy * cz - cx * sz);
+        m[5]  = s * (sx * sy * sz + cx * cz);
+        m[6]  = s * (sx * cy);
+        m[7]  = 0;
+        // Column 2
+        m[8]  = s * (cx * sy * cz + sx * sz);
+        m[9]  = s * (cx * sy * sz - sx * cz);
+        m[10] = s * (cx * cy);
+        m[11] = 0;
+        // Column 3 (Translation)
+        m[12] = x;
+        m[13] = y;
+        m[14] = z;
+        m[15] = 1;
+      }
+
+      // ----------------------------------------------------
+      // WEB AUDIO SYNTHESIZER (Atmospheric Sci-Fi Soundscape)
+      // ----------------------------------------------------
+      var audioCtx = null;
+      var ambientDrone = null;
+      var ambientGain = null;
+
+      function initAudio() {
+        try {
+          var AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (!AudioContext) return;
+          audioCtx = new AudioContext();
+
+          // Ambient chord drone
+          ambientGain = audioCtx.createGain();
+          ambientGain.gain.setValueAtTime(0.06, audioCtx.currentTime);
+          ambientGain.connect(audioCtx.destination);
+
+          // Chord notes (Pentatonic Cyber Drone: C2, G2, D3, A3)
+          var freqs = [65.41, 98.00, 146.83, 220.00];
+          freqs.forEach(function(freq) {
+            var osc = audioCtx.createOscillator();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+
+            // Subtle slow vibrato LFO
+            var lfo = audioCtx.createOscillator();
+            lfo.frequency.setValueAtTime(0.15 + Math.random() * 0.2, audioCtx.currentTime);
+            var lfoGain = audioCtx.createGain();
+            lfoGain.gain.setValueAtTime(1.5, audioCtx.currentTime);
+            lfo.connect(lfoGain);
+            lfoGain.connect(osc.frequency);
+            lfo.start();
+
+            osc.connect(ambientGain);
+            osc.start();
+          });
+        } catch (e) {
+          console.warn("Audio not supported:", e);
+        }
+      }
+
+      function playTriggerSound(type) {
+        if (!CONFIG.audioEnabled || !audioCtx) return;
+        try {
+          var now = audioCtx.currentTime;
+          var osc = audioCtx.createOscillator();
+          var gain = audioCtx.createGain();
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+
+          if (type === 'shockwave') {
+            // Low boom + futuristic pitch drop
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(220, now);
+            osc.frequency.exponentialRampToValueAtTime(35, now + 0.6);
+            gain.gain.setValueAtTime(0.3, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.7);
+            osc.start(now);
+            osc.stop(now + 0.7);
+          } else {
+            // Ethereal chime
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(523.25, now);
+            osc.frequency.exponentialRampToValueAtTime(1046.5, now + 0.35);
+            gain.gain.setValueAtTime(0.12, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+            osc.start(now);
+            osc.stop(now + 0.4);
+          }
+        } catch (e) {}
+      }
+
+      // ----------------------------------------------------
+      // SHOCKWAVE TRIGGER (Kinetic Explosion & Reassembly)
+      // ----------------------------------------------------
+      function triggerShockwave() {
+        CONFIG.isShockwave = true;
+        CONFIG.shockwaveTime = performance.now();
+        playTriggerSound('shockwave');
+        showToast("💥 KINETIC SHOCKWAVE FIRED!");
+
+        for (var i = 0; i < TOTAL_CUBES; i++) {
+          var d = cubeData[i];
+          var dist = Math.sqrt(d.currX * d.currX + d.currY * d.currY + d.currZ * d.currZ) + 1;
+          var speed = 120 + Math.random() * 140;
+          d.burstVx = (d.currX / dist) * speed + (Math.random() - 0.5) * 80;
+          d.burstVy = (d.currY / dist) * speed + (Math.random() - 0.5) * 80;
+          d.burstVz = (d.currZ / dist) * speed + (Math.random() - 0.5) * 80;
+        }
+      }
+
+      // ----------------------------------------------------
+      // ANIMATION & KINETIC GEOMETRY LOOP
+      // ----------------------------------------------------
+      var lastTime = performance.now();
+      var frameCount = 0;
+      var lastFpsUpdate = performance.now();
+      var tourTimer = 0;
+
+      function updateVisualization(timestamp) {
+        var delta = (timestamp - lastTime) * 0.001;
+        if (delta > 0.1) delta = 0.1;
+        lastTime = timestamp;
+
+        var t = (timestamp * 0.001) * CONFIG.speed;
+
+        // Auto-tour through formations every 9 seconds
+        if (CONFIG.autoTour) {
+          tourTimer += delta;
+          if (tourTimer > 9.0) {
+            tourTimer = 0;
+            cycleFormation();
+          }
+        }
+
+        // Camera auto-orbit
+        if (CONFIG.autoOrbit && r && r.camera) {
+          r.camera.rotate([0.6 * CONFIG.speed, 0]);
+        }
+
+        // Shockwave explosion timer
+        var shockwaveProgress = 0;
+        if (CONFIG.isShockwave) {
+          var elapsed = (timestamp - CONFIG.shockwaveTime) * 0.001;
+          if (elapsed > 1.8) {
+            CONFIG.isShockwave = false;
+          } else {
+            // Easing: explosion blast then magnetic snap-back
+            shockwaveProgress = Math.sin((elapsed / 1.8) * Math.PI);
+          }
+        }
+
+        var SPACING = 18;
+
+        // Update all sculpture & flying cubes
+        for (var i = 0; i < TOTAL_CUBES; i++) {
+          var d = cubeData[i];
+          var cube = cubes[i];
+
+          var targetX = 0, targetY = 0, targetZ = 0;
+          var rotX = d.currRotX, rotY = d.currRotY, rotZ = d.currRotZ;
+          var scale = 1.0;
+
+          // ==================================================
+          // FORMATION 1: MATRIX WAVE GRID
+          // ==================================================
+          if (CONFIG.mode === 'wave') {
+            if (!d.isScout) {
+              var gx = d.gridX * SPACING;
+              var gy = d.gridY * SPACING;
+              var dist = Math.sqrt(gx * gx + gy * gy);
+              
+              // Tri-harmonic ripples
+              var wave1 = Math.sin(dist * 0.045 - t * 2.5);
+              var wave2 = Math.cos(gx * 0.03 + t * 1.5) * Math.sin(gy * 0.03 + t * 1.5);
+              var gz = (wave1 * 32 + wave2 * 24) * CONFIG.waveAmp;
+
+              targetX = gx;
+              targetY = gy;
+              targetZ = gz;
+
+              rotX = wave1 * 0.4 * CONFIG.spinSpeed;
+              rotY = wave2 * 0.4 * CONFIG.spinSpeed;
+              rotZ += 0.015 * CONFIG.spinSpeed;
+            }
+          }
+
+          // ==================================================
+          // FORMATION 2: COSMIC VORTEX (Spiral Accretion Disk)
+          // ==================================================
+          else if (CONFIG.mode === 'spiral') {
+            if (!d.isScout) {
+              var idx = d.index;
+              var theta = idx * 0.32 + t * 0.7;
+              var rad = 15 + Math.sqrt(idx / NUM_SCULPTURE) * 115;
+              var height = (idx / NUM_SCULPTURE - 0.5) * 130 * CONFIG.waveAmp;
+              var ripple = Math.sin(rad * 0.06 - t * 2.2) * 18 * CONFIG.waveAmp;
+
+              targetX = Math.cos(theta) * rad;
+              targetY = Math.sin(theta) * rad;
+              targetZ = height + ripple;
+
+              rotX += 0.02 * CONFIG.spinSpeed;
+              rotY += 0.03 * CONFIG.spinSpeed;
+              rotZ = theta + Math.PI / 2;
+            }
+          }
+
+          // ==================================================
+          // FORMATION 3: CELESTIAL CORE (Pulsing Sphere)
+          // ==================================================
+          else if (CONFIG.mode === 'sphere') {
+            if (!d.isScout) {
+              var idx = d.index;
+              // Fibonacci spherical lattice
+              var phi = Math.acos(1 - 2 * (idx + 0.5) / NUM_SCULPTURE);
+              var theta = Math.PI * (1 + Math.sqrt(5)) * idx + t * 0.4;
+              
+              // Breathing sphere radius
+              var rPulse = (78 + Math.sin(t * 2.2) * 14 + Math.sin(theta * 3) * 8) * CONFIG.waveAmp;
+
+              targetX = rPulse * Math.sin(phi) * Math.cos(theta);
+              targetY = rPulse * Math.sin(phi) * Math.sin(theta);
+              targetZ = rPulse * Math.cos(phi);
+
+              rotX = phi;
+              rotY = theta;
+              rotZ += 0.02 * CONFIG.spinSpeed;
+            }
+          }
+
+          // ==================================================
+          // FORMATION 4: CYBER METROPOLIS (Skyline Visualizer)
+          // ==================================================
+          else if (CONFIG.mode === 'city') {
+            if (!d.isScout) {
+              var gx = d.gridX * (SPACING * 1.05);
+              var gy = d.gridY * (SPACING * 1.05);
+              var dist = Math.sqrt(gx * gx + gy * gy);
+
+              // Procedural audio-like skyline bars
+              var freq = Math.sin(d.gridX * 0.8 + t * 2.0) * Math.cos(d.gridY * 0.8 - t * 1.5);
+              var barHeight = Math.abs(freq) * 75 * CONFIG.waveAmp + 10;
+
+              targetX = gx;
+              targetY = gy;
+              targetZ = barHeight * 0.5 - 20;
+
+              // Tower scale elongation
+              scale = 0.85 + (barHeight / 85) * 0.35;
+              rotX = 0;
+              rotY = 0;
+              rotZ = 0;
+            }
+          }
+
+          // ==================================================
+          // FORMATION 5: QUANTUM TORUS (Donut Ring Vortex)
+          // ==================================================
+          else if (CONFIG.mode === 'torus') {
+            if (!d.isScout) {
+              var idx = d.index;
+              var u = (idx % 13) * (Math.PI * 2 / 13) + t * 1.8;
+              var v = Math.floor(idx / 13) * (Math.PI * 2 / 13) + t * 0.6;
+              var R_major = 82;
+              var r_minor = 32 * CONFIG.waveAmp;
+
+              targetX = (R_major + r_minor * Math.cos(u)) * Math.cos(v);
+              targetY = (R_major + r_minor * Math.cos(u)) * Math.sin(v);
+              targetZ = r_minor * Math.sin(u);
+
+              rotX = u;
+              rotY = v;
+              rotZ += 0.03 * CONFIG.spinSpeed;
+            }
+          }
+
+          // ==================================================
+          // FORMATION 6: SUPERNOVA SWARM (Flocking Chaos)
+          // ==================================================
+          else if (CONFIG.mode === 'swarm') {
+            var seed = d.index * 1.618;
+            var swarmRad = 85 + Math.sin(t * 0.8 + seed) * 45;
+            var swarmAngleA = t * (0.8 + (d.index % 7) * 0.1) + seed;
+            var swarmAngleB = t * (0.5 + (d.index % 5) * 0.1) + seed * 0.7;
+
+            targetX = Math.cos(swarmAngleA) * Math.sin(swarmAngleB) * swarmRad;
+            targetY = Math.sin(swarmAngleA) * Math.sin(swarmAngleB) * swarmRad;
+            targetZ = Math.cos(swarmAngleB) * swarmRad;
+
+            rotX += 0.04 * CONFIG.spinSpeed;
+            rotY += 0.05 * CONFIG.spinSpeed;
+            rotZ += 0.03 * CONFIG.spinSpeed;
+          }
+
+          // ==================================================
+          // FLYING SCOUT CUBES DYNAMICS (Always Streaking in 3D)
+          // ==================================================
+          if (d.isScout && CONFIG.mode !== 'swarm') {
+            var sTime = t * d.orbitSpeed * CONFIG.scoutVelocity + d.orbitPhase;
+            // Lissajous 3D flight trajectory
+            var flightX = Math.sin(sTime * 1.2) * d.orbitRadiusA;
+            var flightY = Math.cos(sTime * 0.9) * d.orbitRadiusB;
+            var flightZ = Math.sin(sTime * 1.5 + d.orbitPhase) * 65 * CONFIG.waveAmp;
+
+            // Apply 3D coordinate tilt
+            var cosTx = Math.cos(d.orbitTiltX), sinTx = Math.sin(d.orbitTiltX);
+            targetX = flightX;
+            targetY = flightY * cosTx - flightZ * sinTx;
+            targetZ = flightY * sinTx + flightZ * cosTx;
+
+            // Rapid tumble for flying scouts
+            rotX += 0.07 * CONFIG.spinSpeed;
+            rotY += 0.09 * CONFIG.spinSpeed;
+            rotZ += 0.06 * CONFIG.spinSpeed;
+            scale = 0.8 + Math.sin(sTime * 2.0) * 0.25;
+          }
+
+          // Smooth interpolation towards target position (Morph Easing)
+          var lerpRate = 0.085;
+          d.currX += (targetX - d.currX) * lerpRate;
+          d.currY += (targetY - d.currY) * lerpRate;
+          d.currZ += (targetZ - d.currZ) * lerpRate;
+          d.currRotX = rotX;
+          d.currRotY = rotY;
+          d.currRotZ = rotZ;
+
+          // Apply kinetic shockwave offset if active
+          var finalX = d.currX;
+          var finalY = d.currY;
+          var finalZ = d.currZ;
+          if (shockwaveProgress > 0) {
+            finalX += d.burstVx * shockwaveProgress;
+            finalY += d.burstVy * shockwaveProgress;
+            finalZ += d.burstVz * shockwaveProgress;
+            scale *= (1.0 + shockwaveProgress * 0.4);
+          }
+
+          // Update cube transform matrix
+          applyTransformMatrix(cube, finalX, finalY, finalZ, d.currRotX, d.currRotY, d.currRotZ, scale);
+
+          // Update dynamic cube color
+          var dist = Math.sqrt(finalX * finalX + finalY * finalY + finalZ * finalZ);
+          var col = getColor(CONFIG.theme, t, dist, i / TOTAL_CUBES);
+
+          // Boost scout brightness
+          if (d.isScout) {
+            col[0] = Math.min(1.0, col[0] * 1.35 + 0.15);
+            col[1] = Math.min(1.0, col[1] * 1.35 + 0.15);
+            col[2] = Math.min(1.0, col[2] * 1.35 + 0.15);
+          }
+          cube.color = col;
+        }
+
+        // FPS Calculation
+        frameCount++;
+        if (timestamp - lastFpsUpdate >= 1000) {
+          var fps = Math.round((frameCount * 1000) / (timestamp - lastFpsUpdate));
+          document.getElementById('fps-display').textContent = fps + ' FPS';
+          frameCount = 0;
+          lastFpsUpdate = timestamp;
+        }
+      }
+
+      // ----------------------------------------------------
+      // DUAL-LOOP ANIMATION DRIVER (Guaranteed 60 FPS)
+      // ----------------------------------------------------
+      var xtkAutoRenders = false;
+
+      // XTK native hook
+      r.onRender = function() {
+        xtkAutoRenders = true;
+        updateVisualization(performance.now());
+      };
+
+      // RequestAnimationFrame driver loop
+      function animLoop(time) {
+        requestAnimationFrame(animLoop);
+        updateVisualization(time);
+        // Trigger render draw call if XTK doesn't auto-loop
+        if (!xtkAutoRenders && r) {
+          r.render();
+        }
+      }
+      requestAnimationFrame(animLoop);
+
+      // ----------------------------------------------------
+      // TOAST NOTIFICATION HELPER
+      // ----------------------------------------------------
+      var toastTimer = null;
+      function showToast(text) {
+        var toast = document.getElementById('toast');
+        toast.textContent = text;
+        toast.classList.add('show');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(function() {
+          toast.classList.remove('show');
+        }, 2200);
+      }
+
+      // ----------------------------------------------------
+      // USER INTERACTION & CONTROLS BINDINGS
+      // ----------------------------------------------------
+      // Formation mode buttons
+      var modeButtons = document.querySelectorAll('[data-mode]');
+      modeButtons.forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          setFormation(this.getAttribute('data-mode'));
+        });
+      });
+
+      function setFormation(modeName) {
+        CONFIG.mode = modeName;
+        modeButtons.forEach(function(b) {
+          b.classList.toggle('active', b.getAttribute('data-mode') === modeName);
+        });
+        var readable = {
+          wave: 'Matrix Wave',
+          spiral: 'Cosmic Vortex',
+          sphere: 'Celestial Core',
+          city: 'Metropolis',
+          torus: 'Quantum Torus',
+          swarm: 'Supernova Swarm'
+        }[modeName] || modeName;
+        document.getElementById('state-display').textContent = readable;
+        playTriggerSound('chime');
+        showToast("✦ FORMATION: " + readable.toUpperCase());
+      }
+
+      function cycleFormation() {
+        var modes = ['wave', 'spiral', 'sphere', 'city', 'torus', 'swarm'];
+        var nextIdx = (modes.indexOf(CONFIG.mode) + 1) % modes.length;
+        setFormation(modes[nextIdx]);
+      }
+
+      // Color theme buttons
+      var themeButtons = document.querySelectorAll('[data-theme]');
+      themeButtons.forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          setTheme(this.getAttribute('data-theme'));
+        });
+      });
+
+      function setTheme(themeName) {
+        CONFIG.theme = themeName;
+        themeButtons.forEach(function(b) {
+          b.classList.toggle('active', b.getAttribute('data-theme') === themeName);
+        });
+        showToast("🎨 THEME: " + themeName.toUpperCase());
+        playTriggerSound('chime');
+      }
+
+      function cycleTheme() {
+        var themes = ['synthwave', 'aurora', 'solar', 'prismatic', 'biolum', 'matrix'];
+        var nextIdx = (themes.indexOf(CONFIG.theme) + 1) % themes.length;
+        setTheme(themes[nextIdx]);
+      }
+
+      // Sliders
+      document.getElementById('slider-speed').addEventListener('input', function(e) {
+        CONFIG.speed = parseFloat(e.target.value);
+        document.getElementById('val-speed').textContent = CONFIG.speed.toFixed(1) + 'x';
+      });
+
+      document.getElementById('slider-wave').addEventListener('input', function(e) {
+        CONFIG.waveAmp = parseFloat(e.target.value);
+        document.getElementById('val-wave').textContent = CONFIG.waveAmp.toFixed(1) + 'x';
+      });
+
+      document.getElementById('slider-spin').addEventListener('input', function(e) {
+        CONFIG.spinSpeed = parseFloat(e.target.value);
+        document.getElementById('val-spin').textContent = CONFIG.spinSpeed.toFixed(1) + 'x';
+      });
+
+      document.getElementById('slider-scout').addEventListener('input', function(e) {
+        CONFIG.scoutVelocity = parseFloat(e.target.value);
+        document.getElementById('val-scout').textContent = CONFIG.scoutVelocity.toFixed(1) + 'x';
+      });
+
+      // Kinetic shockwave button
+      document.getElementById('btn-shockwave').addEventListener('click', triggerShockwave);
+
+      // Auto-Tour button
+      var btnTour = document.getElementById('btn-tour');
+      btnTour.addEventListener('click', function() {
+        CONFIG.autoTour = !CONFIG.autoTour;
+        tourTimer = 0;
+        this.textContent = '🔄 Auto-Tour: ' + (CONFIG.autoTour ? 'ON' : 'OFF');
+        this.classList.toggle('active', CONFIG.autoTour);
+        showToast("AUTO-TOUR: " + (CONFIG.autoTour ? 'ENABLED' : 'DISABLED'));
+      });
+
+      // Camera Orbit button
+      var btnOrbit = document.getElementById('btn-orbit');
+      btnOrbit.addEventListener('click', function() {
+        CONFIG.autoOrbit = !CONFIG.autoOrbit;
+        this.textContent = '🎥 Orbit: ' + (CONFIG.autoOrbit ? 'ON' : 'OFF');
+        this.classList.toggle('active', CONFIG.autoOrbit);
+        showToast("CAMERA ORBIT: " + (CONFIG.autoOrbit ? 'ENABLED' : 'DISABLED'));
+      });
+
+      // Ambient Synthesizer audio button
+      var btnAudio = document.getElementById('btn-audio');
+      btnAudio.addEventListener('click', function() {
+        CONFIG.audioEnabled = !CONFIG.audioEnabled;
+        if (CONFIG.audioEnabled) {
+          if (!audioCtx) initAudio();
+          if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+          this.textContent = '🔊 Synth: ON';
+          this.classList.add('active');
+          showToast("AMBIENT SYNTH ACTIVATED");
+        } else {
+          if (audioCtx && audioCtx.state === 'running') audioCtx.suspend();
+          this.textContent = '🔊 Synth: OFF';
+          this.classList.remove('active');
+          showToast("AUDIO MUTED");
+        }
+      });
+
+      // Reset camera view
+      document.getElementById('btn-reset-cam').addEventListener('click', function() {
+        r.camera.position = [0, -220, 260];
+        r.camera.focus = [0, 0, 0];
+        r.camera.up = [0, 0, 1];
+        showToast("CAMERA RESET");
+      });
+
+      // Export scene JSON via loader.js download()
+      document.getElementById('btn-export').addEventListener('click', function() {
+        if (typeof download === 'function') {
+          showToast("EXPORTING SCENE.JSON...");
+          download();
+        } else {
+          alert("loader.js download() function not found.");
+        }
+      });
+
+      // Import scene JSON via loader.js upload()
+      var sceneFileInput = document.getElementById('scene-file-input');
+      document.getElementById('btn-import').addEventListener('click', function() {
+        sceneFileInput.click();
+      });
+
+      sceneFileInput.addEventListener('change', function(e) {
+        var file = e.target.files[0];
+        if (!file) return;
+        var reader = new FileReader();
+        reader.onload = function(evt) {
+          try {
+            var url = URL.createObjectURL(file);
+            if (typeof upload === 'function') {
+              showToast("IMPORTING SCENE...");
+              upload(url);
+            }
+          } catch (err) {
+            alert("Error loading scene: " + err);
+          }
+        };
+        reader.readAsText(file);
+      });
+
+      // HUD Collapse / Expand
+      var hud = document.getElementById('hud');
+      document.getElementById('hud-close-btn').addEventListener('click', function() {
+        hud.classList.add('collapsed');
+      });
+      document.getElementById('toggle-hud-btn').addEventListener('click', function() {
+        hud.classList.remove('collapsed');
+      });
+
+      // Keyboard shortcuts
+      window.addEventListener('keydown', function(e) {
+        // Spacebar: Shockwave
+        if (e.code === 'Space') {
+          e.preventDefault();
+          triggerShockwave();
+        }
+        // M: Next Mode
+        else if (e.key === 'm' || e.key === 'M') {
+          cycleFormation();
+        }
+        // C: Next Color Theme
+        else if (e.key === 'c' || e.key === 'C') {
+          cycleTheme();
+        }
+        // O: Toggle Orbit
+        else if (e.key === 'o' || e.key === 'O') {
+          btnOrbit.click();
+        }
+        // T: Toggle Tour
+        else if (e.key === 't' || e.key === 'T') {
+          btnTour.click();
+        }
+        // R: Reset Camera
+        else if (e.key === 'r' || e.key === 'R') {
+          document.getElementById('btn-reset-cam').click();
+        }
+        // S: Save Scene
+        else if (e.key === 's' || e.key === 'S') {
+          document.getElementById('btn-export').click();
+        }
+      });
+    };
+  </script>
+</body>
+</html>
